@@ -28,8 +28,9 @@ DEPENDENCIES = {
     "lxml": "Required by final verification and OOXML adapters",
     "numpy": "Parquet; optional CSV acceleration",
     "pyarrow": "Parquet; optional CSV acceleration",
-    "openpyxl": "Legacy XLS conversion; optional XLSX test tooling",
-    "xlrd": "Legacy XLS conversion (always blocked for submission)",
+    "openpyxl": "XLSX preflight and test tooling",
+    "xlrd": "Independent native XLS cell/type inspection",
+    "olefile": "Native XLS container inspection",
 }
 
 HUMAN_REASONS = {
@@ -112,8 +113,8 @@ def refresh_report_summaries(report):
                 next_action = guidance_for('compressed_input_extract_first')
             elif '.' + input_format not in SUPPORTED_SUFFIXES:
                 next_action = guidance_for('unsupported_format')
-        if record.get('input_format') == 'xls':
-            next_action = guidance_for('legacy_excel_converted_to_xlsx')
+        if record.get('input_format') == 'xls' and record.get('metrics', {}).get('format_limitations'):
+            next_action = guidance_for('native_xls_inspection_incomplete')
         record['next_action'] = next_action
         counts = record.get("counts_by_category", {})
         for category, count in counts.items():
@@ -195,8 +196,11 @@ def render_report_markdown(report):
             lines.append("No explicit human PII matches were reported." if key == "human_pii" else "None reported.")
     lines += ["", "Counts describe affected items, not unique people; categories can overlap. Format limitations explicitly count affected files. Artifact links retain safe supplied basenames; original PII values, original full paths and identity mappings are excluded.", "", "## File details", ""]
     for r in report.get("files", []):
+        fallback_action = ('Local checks and review passed. Any Matilda upload is a separate manual action; import acceptance remains unverified.'
+                           if r.get('submission_status') == 'ready_for_manual_submission'
+                           else 'Complete the required context review and verification.')
         lines += [f"### {r['file_id']}", "", "Warnings: " + (", ".join(_safe_codes(r.get("warnings", []))) or "none"), "",
-                  "Next action: " + (r.get('next_action') or 'Complete the required context review and verification.') + "", "",
+                  "Next action: " + (r.get('next_action') or fallback_action), "",
                   "Format limitations: " + (", ".join(r.get("format_limitations", [])) or "none reported"), "",
                   "Scope-review issues: " + (", ".join(r.get("policy_alignment_issues", [])) or "none"), "",
                   "Initial unresolved review occurrences: " + str(r.get("context_review", {}).get("unresolved_review_occurrences", 0)) + ". These are not confirmed PII masks; later review decisions may resolve them.", "",
@@ -225,7 +229,7 @@ def dependency_status(formats=None):
     if "parquet" in selected:
         required.update({"numpy", "pyarrow"})
     if "xls" in selected:
-        required.update({"xlrd", "openpyxl"})
+        required.update({"xlrd", "olefile"})
     modules = {}
     for key, purpose in DEPENDENCIES.items():
         try:
@@ -342,7 +346,7 @@ class Runner:
                 if self.prior_source_bindings is None:
                     raise ScrubError('review_plan_source_provenance_missing')
                 require_source_match(self.prior_source_bindings, record['file_id'], src, self.max_bytes)
-            out_suffix = ".xlsx" if suffix == ".xls" else suffix
+            out_suffix = suffix
             artifact = self.artifact_path(src, record, out_suffix, ctx)
             if suffix == ".csv":
                 metrics = structured.scrub_csv(src, artifact, ctx)
@@ -355,7 +359,6 @@ class Runner:
                 if adapter is None:
                     raise ScrubError("legacy_excel_adapter_unavailable")
                 metrics = adapter(src, artifact, ctx)
-                ctx.warn("legacy_excel_converted_to_xlsx")
             else:
                 raise ScrubError('unsupported_format')
             if fingerprint_source(src, self.max_bytes) != binding:

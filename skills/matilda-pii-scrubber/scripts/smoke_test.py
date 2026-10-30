@@ -172,18 +172,18 @@ class HumanOnlyBehavior(unittest.TestCase):
         before=source.read_bytes(); output=self.root/'clean.xlsx'; structured.scrub_xlsx(source,output,ScrubContext()); result=load_workbook(output,data_only=False)
         self.assertEqual(result.sheetnames,workbook.sheetnames); self.assertEqual(result.worksheets[0]['A2'].value,'vm-prod-01'); self.assertEqual(result.worksheets[0]['D2'].value,'X'*len(PERSON)); self.assertEqual(result.worksheets[0]['B3'].value,'Contact '+'X'*len(EMAIL))
         self.assertEqual(result.worksheets[0]['C4'].value,'=SUM(C2:C3)'); self.assertEqual(result.worksheets[0]['B2'].comment.text,'Database maintenance'); self.assertEqual(result.worksheets[1]['B2'].value,'10.0.0.1'); self.assertEqual(result.worksheets[1]['A2'].value,'X'*len(EMAIL)); self.assertEqual(source.read_bytes(),before)
-    @unittest.skipUnless(importlib.util.find_spec('xlrd') and importlib.util.find_spec('xlwt') and importlib.util.find_spec('openpyxl'),'legacy Excel libraries unavailable')
-    def test_xls_preserves_values_and_discloses_inspection_limit(self):
-        import xlwt
-        from openpyxl import load_workbook
-        source=self.root/'input.xls'; workbook=xlwt.Workbook(); sheet=workbook.add_sheet('Infrastructure')
+    @unittest.skipUnless(importlib.util.find_spec('xlrd') and importlib.util.find_spec('xlwt') and importlib.util.find_spec('olefile'),'native Excel libraries unavailable')
+    def test_xls_preserves_native_values_and_requires_mask_review(self):
+        import xlwt, xlrd
+        source=self.root/'input.xls'; workbook=xlwt.Workbook(); workbook.set_owner(''); sheet=workbook.add_sheet('Infrastructure')
         for col,value in enumerate(['ResourceId','Email','cost']): sheet.write(0,col,value)
         for col,value in enumerate(['vm-prod-01',EMAIL,12.5]): sheet.write(1,col,value)
-        workbook.save(str(source)); output=self.root/'clean.xlsx'; metrics=structured.scrub_xls(source,output,ScrubContext()); result=load_workbook(output).active
-        self.assertEqual(result['A2'].value,'vm-prod-01'); self.assertEqual(result['B2'].value,'X'*len(EMAIL)); self.assertEqual(result['C2'].value,12.5)
-        self.assertTrue(metrics.get('incomplete'))
+        workbook.save(str(source)); output=self.root/'clean.xls'; metrics=structured.scrub_xls(source,output,ScrubContext())
+        with xlrd.open_workbook(output) as book:
+            self.assertEqual(book.sheet_by_index(0).row_values(1), ['vm-prod-01','X'*len(EMAIL),12.5])
+        self.assertFalse(metrics.get('incomplete'))
         _,batch,report=self.launch(source)
-        self.assertEqual(report['files'][0]['privacy_status'],'partial')
+        self.assertEqual(report['files'][0]['privacy_status'],'requires_context_review')
         _,final=self.finalize(batch)
         self.assertEqual(final['files'][0]['submission_status'],'blocked')
     @unittest.skipUnless(importlib.util.find_spec('openpyxl'),'openpyxl unavailable')

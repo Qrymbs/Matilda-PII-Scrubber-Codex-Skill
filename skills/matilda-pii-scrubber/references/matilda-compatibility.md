@@ -8,4 +8,4 @@ Keep three states separate: processing completed, locally reviewed and ready for
 
 Finalized copies are separated into `ready/` and `blocked/`. Re-finalizing first revokes previous ready status. Deliver actual processed copies with clickable links, per-file summaries and explicit statuses directly in chat, including blocked copies. A failed or incomplete input must be listed even when no scrubbed copy is possible. Ready means local checks passed and is never a claim of Matilda importer acceptance.
 
-Rejected archives and other denied formats produce no artifact. XLS conversion losses, embedded images/objects or incomplete comparisons keep an accepted input blocked. Other independent files may still complete. Do not infer that passing synthetic tests establishes zero residual PII, legal anonymization or universal file support.
+Rejected archives and other denied formats produce no artifact. Unsupported XLS content, embedded images/objects or incomplete comparisons keep an accepted input blocked. Other independent files may still complete. Do not infer that passing synthetic tests establishes zero residual PII, legal anonymization or universal file support.

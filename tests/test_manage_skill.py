@@ -52,7 +52,8 @@ class ManageSkillTests(unittest.TestCase):
                         ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
         skill = candidate / "skills/matilda-pii-scrubber/SKILL.md"
         text = skill.read_text()
-        text = text.replace('version: "1.0.0"', f'version: "{version}"')
+        current_version = (REPO_ROOT / 'VERSION').read_text().strip()
+        text = text.replace(f'version: "{current_version}"', f'version: "{version}"')
         skill.write_text(text)
         (candidate / "VERSION").write_text(version + "\n")
         (candidate / "tools").mkdir()
@@ -377,6 +378,9 @@ class ManageSkillTests(unittest.TestCase):
              "expected_submission_status": "blocked" if format_name == "xls" else "ready_for_manual_submission"}
             for format_name in ("csv", "xlsx", "xls", "parquet")
         ]}
+        xls = next(row for row in preflight['results'] if row['format'] == 'xls')
+        xls['native_supported_case'] = {'passed': True, 'expected_submission_status': 'ready_for_manual_submission'}
+        xls['unsupported_formula_case'] = {'passed': True, 'expected_submission_status': 'blocked'}
         (scripts / "preflight.py").write_text("print(" + repr(json.dumps(preflight)) + ")\n")
         runtime = self.root / "discovery-runtime"
         real_run = subprocess.run

@@ -22,6 +22,10 @@ _GUIDANCE = {
         'Legacy .xls conversion cannot be approved for upload. Re-export or save '
         'the original workbook as a genuine .xlsx file, then run the skill again; '
         'do not rename the extension.'),
+    'native_xls_inspection_incomplete': (
+        'This XLS workbook has content or a text-storage conflict that cannot be fully '
+        'inspected and safely masked. Keep it blocked. Review the listed limitations; '
+        'if needed, save or export the original as genuine XLSX and scrub that new original.'),
 }
 
 

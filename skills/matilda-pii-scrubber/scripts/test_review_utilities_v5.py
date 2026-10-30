@@ -94,6 +94,9 @@ class ReviewUtilitiesV5(unittest.TestCase):
             self.assertTrue(row['processing_and_finalization_tested'],row)
             self.assertEqual(row['expected_submission_status'],
                              'blocked' if row['format']=='xls' else 'ready_for_manual_submission')
+            if row['format'] == 'xls':
+                self.assertTrue(row['native_supported_case']['passed'])
+                self.assertEqual(row['native_supported_case']['expected_submission_status'], 'ready_for_manual_submission')
         for forbidden in ['Avery Stone','vm-preflight-001','matilda-preflight-']:
             self.assertNotIn(forbidden,result.stdout)
 

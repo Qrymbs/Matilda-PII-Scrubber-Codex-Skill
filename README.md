@@ -1,10 +1,10 @@
 # Matilda PII Scrubber Codex Skill
 
-**Version 1.0.0 · Private team distribution**
+**Version 1.1.0 · Private team distribution**
 
 A Codex skill for reviewing and masking confirmed human PII in customer billing and RVTools files before a separate manual Matilda upload. It preserves originals, billing data and resource identifiers. Every run must return the processed file links, a per-file summary and an explicit upload-preparedness status directly in chat. The processing scripts do not upload files.
 
-This is the first GitHub release. Earlier 5.x numbers were internal development builds; GitHub releases start at 1.0.0. Version 1.0 includes the separate Parquet footer/schema metadata checks and the four-format intake restriction from the validated internal 5.1.0 build.
+Version 1.1 adds native XLS scrubbing and verification. Supported BIFF8 workbooks now remain `.xls` and can qualify for manual upload after the same review gates as the other formats. Version 1.0 used a blocked values-only conversion; reprocess XLS originals with the new release. Earlier 5.x numbers were internal development builds preceding GitHub 1.0.0.
 
 ## Supported scope
 
@@ -13,7 +13,7 @@ This is the first GitHub release. Earlier 5.x numbers were internal development 
 | `.csv` | Can qualify for manual upload after all per-file checks and review pass. |
 | `.xlsx` | Can qualify after all checks, including inspectable workbook metadata and hidden content. Unsupported/opaque content blocks readiness. |
 | `.parquet` | Can qualify after typed data, schema, protected identifiers and separate schema/footer metadata checks pass. |
-| `.xls` | Best-effort conversion to a scrubbed `.xlsx` copy only. **Always blocked for upload.** Save/export the original as a genuine `.xlsx` and submit that new original for review. |
+| `.xls` | Native Excel 97–2003 BIFF8 workbooks can qualify after complete text/metadata inspection, independent cell checks and exact preservation of every unmasked file byte. Formulas, macros, objects, unknown content and incompatible shared text storage remain blocked. |
 | ZIP, gzip and other archives | Rejected. Extract/decompress first and provide individual supported files. |
 | Everything else | Denied; no scrubbed copy is produced. Renaming an extension does not make a file supported. |
 
@@ -25,11 +25,11 @@ The `_SCRUBBED` filename does not establish readiness. Only the finalized status
 
 1. Obtain access to this private repository from its owner and accept the GitHub invitation. Each teammate uses their own GitHub account.
 2. Use Codex desktop with local-file access, Git, GitHub CLI (`gh`) and **Python 3.12**. The release workflow is validated on macOS; other platforms need their own checks. On a Mac with Homebrew, missing prerequisites can be installed with `brew install git gh python@3.12`. Confirm `python3.12 --version` and `gh --version`.
-3. Sign in and install from the Version 1.0 bootstrap. Run these commands in a suitable local software folder, outside customer-data folders:
+3. Sign in and install from the Version 1.1 bootstrap. Run these commands in a suitable local software folder, outside customer-data folders:
 
 ```bash
 gh auth login --hostname github.com --web --git-protocol https
-gh repo clone Qrymbs/Matilda-PII-Scrubber-Codex-Skill -- --branch v1.0.0 --depth 1
+gh repo clone Qrymbs/Matilda-PII-Scrubber-Codex-Skill -- --branch v1.1.0 --depth 1
 cd Matilda-PII-Scrubber-Codex-Skill
 python3.12 tools/manage_skill.py install
 ```
@@ -80,9 +80,9 @@ Use a **local** scheduled task associated with a local project/folder, not a clo
 
 Have each teammate test representative authorized files from their own customer work before relying on the skill routinely:
 
-1. Include CSV billing files, RVTools/XLSX, Parquet, zero-PII examples, free text, repeated values, workbook metadata/hidden content and Parquet footer/schema metadata where available.
+1. Include CSV billing files, RVTools/XLSX, native XLS, Parquet, zero-PII examples, free text, repeated values, workbook metadata/hidden content and Parquet footer/schema metadata where available.
 2. Review both masked and retained content locally. Verify costs, quantities, types, row counts, formulas, schema and resource identifiers against the original. Confirm every identified personal span was correctly handled; a small sample alone does not clear a file.
-3. Exercise blocked cases: an unresolved identity, personal information inside a protected resource name, legacy XLS, ZIP/gzip and an unsupported type. They must not be reported ready.
+3. Exercise blocked cases: an unresolved identity, personal information inside a protected resource name, XLS containing unsupported formulas or opaque content, ZIP/gzip and an unsupported type. They must not be reported ready.
 4. Confirm chat delivery includes the processed files, summaries, exact useful locations, verification reports and readiness for every supplied file. Zero masks is a valid outcome only when review is complete.
 5. Report the version, format, safe file ID, coordinates, expected/actual behavior and import outcome if separately authorized. Share suspected misses or over-masking privately through approved channels, without raw PII in GitHub issues or team messages. Fix defects with general rules and synthetic tests, then repeat affected cases.
 
@@ -102,5 +102,7 @@ python -B -m unittest discover -s tests -p 'test*.py' -v
 python -B -m unittest discover -s skills/matilda-pii-scrubber/scripts -p '*test*.py' -v
 python -B skills/matilda-pii-scrubber/scripts/preflight.py --formats csv xlsx xls parquet
 ```
+
+XLS preflight exercises both a supported native workbook that must become ready and a formula workbook that must remain blocked. Its top-level XLS status describes the blocked fixture for compatibility with the Version 1.0 updater; `native_supported_case` separately proves readiness. Both must pass. Existing Version 1.0 installations use the same update command.
 
 See the skill's [setup and pilot details](skills/matilda-pii-scrubber/references/setup-and-validation.md) and [format limitations](skills/matilda-pii-scrubber/references/formats.md). Customer readiness is always a per-file decision, separate from software release validation.

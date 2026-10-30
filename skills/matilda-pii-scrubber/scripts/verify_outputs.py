@@ -34,7 +34,7 @@ import scrub_structured as structured
 
 _FILE_ID = re.compile(r"file[0-9]{4,}")
 _ORDINAL = re.compile(r"field_[0-9]{4,}_*")
-_FORMATS = {"csv", "parquet", "xlsx"}
+_FORMATS = {"csv", "parquet", "xlsx", "xls"}
 _W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 
 
@@ -1195,6 +1195,171 @@ class ArtifactComparison:
             self.arrow_field(old,new,i,path=(i,))
         self.metric('columns',len(old_schema)); self.metric('output_rows',rows,'rows')
 
+    def xls(self, source, output):
+        """Prove native XLS edits from reviewed spans and complete source bytes.
+
+        The XLS reader supplies coordinates and byte locations only. Neither
+        its scrubber nor a masking detector constructs the expected output.
+        xlrd separately checks the sheet/cell interpretation of both files.
+        """
+        from scrub_xls import inspect_xls
+        try:
+            actual = inspect_xls(output)
+            original = inspect_xls(source) if source is not None else None
+        except ScrubError as exc:
+            _fail(exc.code)
+        actual_raw = Path(output).read_bytes()
+        source_raw = Path(source).read_bytes() if source is not None else None
+        if actual['raw'] != actual_raw or original is not None and original['raw'] != source_raw:
+            _fail('xls_complete_file_inventory_mismatch')
+
+        limitations = set(actual.get('limitations', ()))
+        if original is not None:
+            limitations.update(original.get('limitations', ()))
+        if any(not isinstance(code, str) or not re.fullmatch(r'[a-z][a-z0-9_]{0,119}', code)
+               for code in limitations):
+            _fail('xls_inspection_error_code_invalid')
+        self.result['xls_content_inspection_complete'] = not limitations
+        for code in sorted(limitations):
+            self.error(code, 'independent_candidate_scan_passed')
+            self.error(code, 'policy_scan_passed')
+
+        def inventory(package):
+            items = {}
+            for item in package['items']:
+                location = item['location']
+                if (not isinstance(location, str) or not _SAFE_LOCATION.fullmatch(location)
+                        or location in items):
+                    _fail('xls_text_inventory_invalid')
+                items[location] = item
+            return items
+
+        output_items = inventory(actual)
+        if original is None:
+            for location, item in output_items.items():
+                self.scan(item['value'], item.get('field'), location)
+        else:
+            source_items = inventory(original)
+            if source_items.keys() != output_items.keys():
+                _fail('xls_text_inventory_changed')
+            if original['sheets'] != actual['sheets']:
+                self.error('xls_sheet_structure_changed')
+            if original['streams'].keys() != actual['streams'].keys():
+                self.error('xls_stream_inventory_changed')
+            expected = bytearray(source_raw)
+            plans = []
+            for location, old in source_items.items():
+                new = output_items[location]
+                field = old.get('field')
+                if any(old.get(key) != new.get(key) for key in
+                       ('field', 'structural', 'protected', 'char_bytes')):
+                    self.error('xls_text_representation_changed')
+                value = old['value']
+                wanted, spans, _, _ = self.mask_spec(
+                    value, field, False, self.decision(location), location)
+                if (old.get('structural') or old.get('protected')) and wanted != value:
+                    self.error('review_mask_conflicts_with_preservation')
+                    wanted, spans = value, ()
+                positions = old.get('char_bytes', ())
+                if isinstance(value, str) and positions:
+                    if len(positions) != len(value):
+                        _fail('xls_character_inventory_invalid')
+                    for index, (before, after) in enumerate(zip(value, wanted)):
+                        offsets = positions[index]
+                        if (not offsets or any(type(pos) is not int or not 0 <= pos < len(expected)
+                                               for pos in offsets)):
+                            _fail('xls_character_offset_invalid')
+                        if before == after:
+                            continue
+                        if after != 'X' or len(offsets) not in {1, 2}:
+                            self.error('xls_mask_encoding_unsupported')
+                            continue
+                        for pos, byte in zip(offsets, b'X' if len(offsets) == 1 else b'X\x00'):
+                            expected[pos] = byte
+                elif wanted != value:
+                    self.error('xls_mask_has_no_text_representation')
+                plans.append((old, new, wanted))
+
+            # Shared-string storage may serve several cells. Every reference,
+            # including protected IDs and structural labels, must agree with
+            # the exact requested representation before any byte is trusted.
+            for old, new, wanted in plans:
+                value, positions = old['value'], old.get('char_bytes', ())
+                if isinstance(value, str) and positions:
+                    for index, (before, after) in enumerate(zip(value, wanted)):
+                        offsets = positions[index]
+                        desired = (bytes(source_raw[pos] for pos in offsets) if before == after
+                                   else b'X' if len(offsets) == 1 else b'X\x00' if len(offsets) == 2 else None)
+                        if desired is None or bytes(expected[pos] for pos in offsets) != desired:
+                            self.error('xls_shared_text_mask_conflict')
+                location, field = old['location'], old.get('field')
+                self.pair(value, new['value'], field, location)
+
+            exact = bytes(expected) == actual_raw
+            self.result['xls_all_other_bytes_preserved'] = exact
+            if not exact:
+                self.error('xls_unexpected_source_output_difference')
+            self.result['source_parts_compared'] = len(original['streams'])
+
+        # Independently reopen using a different parser. In addition to the
+        # complete-file comparison above, this proves that changed string
+        # storage still resolves to the expected cells, native types and styles.
+        import xlrd
+        def workbook_snapshot(path):
+            book = xlrd.open_workbook(str(path), on_demand=True,
+                                      formatting_info=True, logfile=io.StringIO())
+            try:
+                if book.biff_version != 80:
+                    _fail('xls_biff_version_unsupported')
+                sheets, cells = [], {}
+                for si in range(book.nsheets):
+                    sheet = book.sheet_by_index(si)
+                    sheets.append({'name': sheet.name, 'nrows': sheet.nrows,
+                                   'ncols': sheet.ncols, 'visibility': sheet.visibility})
+                    for ri in range(sheet.nrows):
+                        for ci in range(sheet.ncols):
+                            cell = sheet.cell(ri, ci)
+                            cells[f's{si+1}.r{ri+1}.c{ci+1}'] = {
+                                'value': cell.value, 'ctype': cell.ctype,
+                                'xf_index': sheet.cell_xf_index(ri, ci)}
+                    book.unload_sheet(si)
+                return {'sheets': sheets, 'cells': cells, 'datemode': book.datemode}
+            finally:
+                book.release_resources()
+
+        def cross_check(package, snapshot):
+            if package['sheets'] != snapshot['sheets']:
+                self.error('xls_independent_sheet_inventory_mismatch')
+            declared = {item['location']: item for item in package['cells']}
+            if len(declared) != len(package['cells']) or declared.keys() != snapshot['cells'].keys():
+                self.error('xls_independent_cell_inventory_mismatch')
+                return
+            inspected = inventory(package)
+            for location, cell in snapshot['cells'].items():
+                item = declared[location]
+                if (not _equal(item['value'], cell['value']) or item['ctype'] != cell['ctype']
+                        or item['xf_index'] != cell['xf_index']):
+                    self.error('xls_independent_cell_interpretation_mismatch')
+                if location not in inspected or not _equal(inspected[location]['value'], cell['value']):
+                    self.error('xls_cell_content_inspection_missing')
+
+        after = workbook_snapshot(output)
+        cross_check(actual, after)
+        if original is not None:
+            before = workbook_snapshot(source)
+            cross_check(original, before)
+            if before['sheets'] != after['sheets'] or before['datemode'] != after['datemode']:
+                self.error('xls_workbook_structure_changed')
+            if before['cells'].keys() != after['cells'].keys():
+                self.error('xls_cell_inventory_changed')
+            else:
+                for location, old in before['cells'].items():
+                    new = after['cells'][location]
+                    if old['ctype'] != new['ctype'] or old['xf_index'] != new['xf_index']:
+                        self.error('xls_cell_type_or_style_changed')
+        self.metric('sheets', len(after['sheets']))
+        self.metric('output_rows', sum(max(0, sheet['nrows']-1) for sheet in after['sheets']), 'rows')
+
     def office(self, source, output, kind):
         proven = {}
         if source is not None:
@@ -1458,7 +1623,7 @@ class SourceVerifier(Verifier):
                 _fail('unsupported_output_format')
             if output.suffix.lower() != '.' + kind:
                 _fail('output_format_does_not_match_artifact')
-            if kind != ('xlsx' if input_format == 'xls' else input_format):
+            if kind != input_format:
                 _fail('unexpected_format_conversion')
             result['reopens']=True
             if source is None:
@@ -1475,6 +1640,8 @@ class SourceVerifier(Verifier):
                 check.text(source,output)
             elif kind=='parquet':
                 check.parquet(source,output)
+            elif kind=='xls':
+                check.xls(source,output)
             elif kind in {'xlsx','docx'}:
                 check.office(source,output,kind)
             else:

@@ -372,6 +372,12 @@ def run_validation(root, runtime, log):
             or any(row.get("passed") is not True or row.get("expected_submission_status") !=
                    ("blocked" if row["format"] == "xls" else "ready_for_manual_submission") for row in rows)):
         raise ManageError(f"Four-format preflight failed. Private log: {log}")
+    xls = next(row for row in rows if row['format'] == 'xls')
+    native = xls.get('native_supported_case', {})
+    if (native.get('passed') is not True
+            or native.get('expected_submission_status') != 'ready_for_manual_submission'
+            or xls.get('unsupported_formula_case', {}).get('passed') is not True):
+        raise ManageError(f"Native XLS ready/blocked preflight coverage failed. Private log: {log}")
     return {"passed": True, **counts, "formats": preflight, "log": str(log),
             "python_version": sys.version.split()[0]}
 

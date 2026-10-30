@@ -73,6 +73,7 @@ class FormatAdmission(unittest.TestCase):
         elif kind == '.xls':
             import xlwt
             book = xlwt.Workbook()
+            book.set_owner('')
             sheet = book.add_sheet('Billing')
             for r, values in enumerate([['resource_id', 'cost'], ['vm-001', 12]]):
                 for c, value in enumerate(values):
@@ -89,7 +90,7 @@ class FormatAdmission(unittest.TestCase):
                 dependency_status([denied])
 
     def test_allowed_case_insensitive_formats_process_and_normalize_report_format(self):
-        for suffix in ('.CSV', '.XLSX', '.PARQUET'):
+        for suffix in ('.CSV', '.XLSX', '.XLS', '.PARQUET'):
             with self.subTest(suffix=suffix):
                 source = self.fixture(suffix)
                 out, proc, report = self.run_inputs([source])
@@ -101,22 +102,25 @@ class FormatAdmission(unittest.TestCase):
                 final_proc, final = self.finalize(out, [source])
                 self.assertEqual(final_proc.returncode, 0, final_proc.stdout + final_proc.stderr)
                 self.assertEqual(final['files'][0]['submission_status'], 'ready_for_manual_submission')
+                final_markdown = (out/'scrub-report.md').read_text()
+                self.assertIn('Local checks and review passed.', final_markdown)
+                self.assertNotIn('Next action: Complete the required context review', final_markdown)
 
-    def test_xls_accepted_as_blocked_conversion_with_reexport_instruction(self):
+    def test_xls_accepted_as_native_workbook_with_no_conversion_guidance(self):
         source = self.fixture('.XLS')
         out, proc, report = self.run_inputs([source])
-        self.assertEqual(proc.returncode, 2)
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
         record = report['files'][0]
         self.assertEqual(record['input_format'], 'xls')
-        self.assertEqual(record['output_format'], 'xlsx')
+        self.assertEqual(record['output_format'], 'xls')
         self.assertTrue((out/record['artifact']).is_file())
-        self.assertIn('genuine .xlsx', record['next_action'])
-        self.assertIn('genuine .xlsx', record['chat_summary']['next_action'])
-        self.assertIn('genuine .xlsx', (out/'scrub-report.md').read_text())
-        self.assertIn('genuine .xlsx', proc.stdout)
+        self.assertIsNone(record['next_action'])
+        self.assertIsNone(record['chat_summary']['next_action'])
+        self.assertEqual((out/record['artifact']).suffix, '.XLS')
+        self.assertEqual((out/record['artifact']).read_bytes(), source.read_bytes())
         final_proc, final = self.finalize(out, [source])
-        self.assertEqual(final_proc.returncode, 2)
-        self.assertEqual(final['files'][0]['submission_status'], 'blocked')
+        self.assertEqual(final_proc.returncode, 0, final_proc.stdout + final_proc.stderr)
+        self.assertEqual(final['files'][0]['submission_status'], 'ready_for_manual_submission')
 
     def test_all_archive_suffixes_rejected_without_copy_or_extraction(self):
         sources = []

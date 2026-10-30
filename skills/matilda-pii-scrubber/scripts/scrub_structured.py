@@ -772,48 +772,5 @@ def scrub_xlsx(src: Path, dst: Path, ctx: ScrubContext) -> dict:
 
 @_guarded
 def scrub_xls(src: Path, dst: Path, ctx: ScrubContext) -> dict:
-    if dst.suffix.lower()!=".xlsx":
-        raise ScrubError("xls_requires_xlsx_output")
-    try:
-        import xlrd
-    except ImportError:
-        raise ScrubError("missing_legacy_excel_dependency") from None
-    try:
-        source=xlrd.open_workbook(src,on_demand=True,formatting_info=False)
-    except Exception:
-        raise ScrubError("xls_unreadable_or_encrypted") from None
-    output=_new_workbook()
-    used,rows,profiles=set(),0,[]
-    count_sheets=source.nsheets
-    ctx.warn("legacy_excel_converted_to_xlsx")
-    ctx.warn("legacy_excel_formula_inspection_incomplete")
-    try:
-        for si in range(count_sheets):
-            sheet=source.sheet_by_index(si)
-            target=output.create_sheet(_safe_sheet_name(sheet.name,si+1,used,ctx))
-            if not sheet.nrows:
-                continue
-            headers=sheet.row_values(0)
-            profiles.append(_profile(headers,ctx,sheet.name))
-            target.append(_safe_names(headers,ctx,f"s{si+1}.r1"))
-            for ri in range(1,sheet.nrows):
-                clean=[]
-                for ci in range(sheet.ncols):
-                    cell=sheet.cell(ri,ci)
-                    value=cell.value
-                    if cell.ctype==xlrd.XL_CELL_DATE:
-                        value=xlrd.xldate.xldate_as_datetime(value,source.datemode)
-                    clean.append(ctx.scrub(value,field=headers[ci] if ci<len(headers) else None,location=f"s{si+1}.r{ri+1}.c{ci+1}"))
-                _append_values(target,clean)
-            rows+=max(0,sheet.nrows-1)
-            source.unload_sheet(si)
-        output.save(dst)
-    finally:
-        source.release_resources()
-        output.close()
-    profiles=[_final_profile(p,ctx) for p in profiles]
-    return {"sheets":count_sheets,"rows":rows,"input_rows":rows,"output_rows":rows,"output_extension":".xlsx",
-            "reconstructed_values_only":True,"all_legacy_data_cells_cleared":False,
-            "formula_inspection_complete":False,"incomplete":True,"format_limitations":["legacy_xls_converted_to_values_only_xlsx_formula_source_and_formatting_not_preserved"],
-            "join_keys_removed":any(p["join_keys_removed"] for p in profiles),
-            "mandatory_fields_nulled":any(p["mandatory_fields_nulled"] for p in profiles)}
+    from scrub_xls import scrub_xls as native_xls
+    return native_xls(src, dst, ctx)

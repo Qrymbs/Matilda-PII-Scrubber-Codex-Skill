@@ -44,8 +44,9 @@ class PreflightScope(unittest.TestCase):
             self.assertTrue(row['processing_and_finalization_tested'], row)
             if row['format'] == 'xls':
                 self.assertEqual(row['expected_submission_status'], 'blocked')
-                self.assertTrue(row['legacy_conversion_only'])
-                self.assertIn('does not qualify XLS for upload', row['note'])
+                self.assertTrue(row['native_supported_case']['passed'])
+                self.assertEqual(row['native_supported_case']['expected_submission_status'], 'ready_for_manual_submission')
+                self.assertTrue(row['unsupported_formula_case']['passed'])
             else:
                 self.assertEqual(row['expected_submission_status'], 'ready_for_manual_submission')
 
