@@ -1,6 +1,6 @@
 # Matilda PII Scrubber Codex Skill
 
-**Version 1.1.0 · Private team distribution**
+**Version 1.1.0 · Public GitHub distribution**
 
 A Codex skill for reviewing and masking confirmed human PII in customer billing and RVTools files before a separate manual Matilda upload. It preserves originals, billing data and resource identifiers. Every run returns
 
@@ -25,18 +25,23 @@ The `_SCRUBBED` filename does not establish readiness. Only the finalized status
 
 ## Install
 
-1. Obtain access to this private repository from its owner and accept the GitHub invitation. Each teammate uses their own GitHub account.
+1. Open the [public repository](https://github.com/Qrymbs/Matilda-PII-Scrubber-Codex-Skill). No invitation or collaborator access is needed to download and use the skill.
 2. Use Codex desktop with local-file access, Git, GitHub CLI (`gh`) and **Python 3.12**. The release workflow is validated on macOS; other platforms need their own checks. On a Mac with Homebrew, missing prerequisites can be installed with `brew install git gh python@3.12`. Confirm `python3.12 --version` and `gh --version`.
-3. Sign in and install from the Version 1.1 bootstrap. Run these commands in a suitable local software folder, outside customer-data folders:
+3. The current installer and updater use authenticated GitHub CLI requests, even though the repository is public. Check `gh auth status` and reuse your existing sign-in. If needed, sign in with your own GitHub account:
 
 ```bash
 gh auth login --hostname github.com --web --git-protocol https
+```
+
+Then install from the Version 1.1 bootstrap. Run these commands in a suitable local software folder, outside customer-data folders:
+
+```bash
 gh repo clone Qrymbs/Matilda-PII-Scrubber-Codex-Skill -- --branch v1.1.0 --depth 1
 cd Matilda-PII-Scrubber-Codex-Skill
 python3.12 tools/manage_skill.py install
 ```
 
-The installer fetches the latest published stable release from this private repository, checks its version and immutable commit, creates a dedicated Python environment, installs pinned dependencies, and runs the full synthetic test suite plus CSV/XLSX/XLS/Parquet preflight **before activation**. Internet access is needed for GitHub and Python dependencies. Keep the command's final result; a failed install is not ready for use.
+The installer fetches the latest published stable release from this public repository, checks its version and immutable commit, creates a dedicated Python environment, installs pinned dependencies, and runs the full synthetic test suite plus CSV/XLSX/XLS/Parquet preflight **before activation**. Internet access is needed for GitHub and Python dependencies. Keep the command's final result; a failed install is not ready for use.
 
 New installations use `~/.agents/skills/matilda-pii-scrubber`. A single existing legacy installation at `~/.codex/skills/matilda-pii-scrubber` is backed up and adopted. If both locations contain a copy, the installer stops: resolve the duplicate before continuing. Do not maintain two active skills with the same name.
 
@@ -46,7 +51,7 @@ The manager, runtime, validation evidence and backups live outside the skill at 
 python3.12 ~/.local/share/matilda-pii-scrubber/manage_skill.py status
 ```
 
-You can also ask Codex: “Install the latest stable release of the private Qrymbs/Matilda-PII-Scrubber-Codex-Skill repository using its README and installer. Use my GitHub access, run all installation checks, and report the installed version and result. Ask me to complete sign-in if needed.”
+You can also ask Codex: “Install the latest stable release of https://github.com/Qrymbs/Matilda-PII-Scrubber-Codex-Skill using its README and managed installer. The repository is public; no invitation is required. Check Git, GitHub CLI and Python 3.12, reuse my GitHub authentication or ask me to sign in if needed, run all installation checks, and report the installed version and result.”
 
 ## Use it
 
@@ -58,7 +63,7 @@ Codex must use the managed Python interpreter reported by `status` for processin
 
 Review the file link, summary and verification report. A processed but blocked file is still delivered and labeled **“Blocked — do not upload.”** If no safe output can be produced, the chat explains why. Upload only a file whose final checks pass, through your normal separately authorized Matilda process. Treat import acceptance as a separate result.
 
-Keep originals, outputs and run evidence in approved private customer-data locations, outside this repository and the installed skill. Codex use must follow your team's approved customer-data handling. Do not commit customer files or raw PII examples, or put them into shared feedback.
+Keep originals, outputs and run evidence in approved private customer-data locations, outside this repository and the installed skill. Codex use must follow your team's approved customer-data handling. This repository and its issues are public: do not commit or attach customer files, customer run reports or raw PII examples. Use synthetic examples for public feedback and approved private channels for customer-specific investigation.
 
 ## Update with one command
 
@@ -66,13 +71,13 @@ Keep originals, outputs and run evidence in approved private customer-data locat
 python3.12 ~/.local/share/matilda-pii-scrubber/manage_skill.py update
 ```
 
-The updater checks published stable GitHub releases, not unreleased changes on `main`. It validates a candidate in a new environment before replacing the active skill, keeps a backup, and restores the prior installation if activation fails. An unchanged release is a no-op. Local edits, moved tags, downgrades, missing access or failed checks stop the update rather than silently replacing the working skill. Resolve failures and retry; do not bypass validation or hand-edit readiness reports.
+The updater checks published stable GitHub releases, not unreleased changes on `main`. It validates a candidate in a new environment before replacing the active skill, keeps a backup, and restores the prior installation if activation fails. An unchanged release is a no-op. Local edits, moved tags, downgrades, GitHub authentication failures or failed checks stop the update rather than silently replacing the working skill. Resolve failures and retry; do not bypass validation or hand-edit readiness reports.
 
 Backups and candidate environments are retained locally; clean up old ones only after confirming the installed release works. Do not edit a managed installation directly—propose general fixes in the repository, using synthetic fixtures.
 
 ## Set up a weekly update task in Codex
 
-After a successful install, run the update command once in an ordinary local chat to verify access. Then send Codex this prompt on **each teammate's own computer**:
+After a successful install, run the update command once in an ordinary local chat to verify GitHub authentication and connectivity. No repository invitation is needed. Then send Codex this prompt on **each teammate's own computer**:
 
 > Create a standalone local scheduled task named “Update Matilda PII Scrubber” for every Monday at 9:00 AM in my local timezone, with a new chat for each run. Run `python3.12 ~/.local/share/matilda-pii-scrubber/manage_skill.py update` using my existing GitHub authentication. Install only the latest stable release from Qrymbs/Matilda-PII-Scrubber-Codex-Skill through that manager and its validation checks. Do not process customer files. Report a successful version change, failed update or required action; keep the current working installation when validation fails. If it is already current, do not send an update notification.
 
@@ -95,7 +100,7 @@ Parquet files processed by **internal build 5.0.1 or earlier** must be reprocess
 1. Change code and synthetic tests together. Run the root updater tests and the full skill suite, then four-format preflight. CI runs these checks on pushes and pull requests. Do not use customer files in CI.
 2. Increment root `VERSION` and `skills/matilda-pii-scrubber/SKILL.md` together. Publish an immutable matching `vX.Y.Z` tag and a non-draft, non-prerelease GitHub release only after validation. Do not move a released tag or mark an older release as latest.
 3. Test the published release with an isolated fresh install and an update from the preceding release. Record the exact commit, platform, test counts, failures/skips and preflight result. Publishing a release makes it eligible for teammates' next update.
-4. Keep repository access limited to intended teammates. The owner adds them in GitHub **Settings → Collaborators**, using their GitHub usernames; each must accept the invitation.
+4. The repository is public; anyone can view and download it. Limit write access to intended maintainers. Collaborator invitations are only needed to grant write access, not to install or update the skill. Publish only software, documentation and synthetic fixtures; keep customer files, run evidence and raw PII out of commits, issues and release assets.
 
 Developer checks (in an isolated Python 3.12 environment with `requirements-dev.txt` installed):
 
