@@ -4,7 +4,7 @@
 
 A Codex skill for reviewing and masking confirmed human PII in customer billing and RVTools files before a separate manual Matilda upload. It preserves originals, billing data and resource identifiers. Every run returns
 
-1. The processed file links
+1. The scrubbed file(s)
 2. A per-file summary
 3. An explicit upload-preparedness status directly in chat.
 
