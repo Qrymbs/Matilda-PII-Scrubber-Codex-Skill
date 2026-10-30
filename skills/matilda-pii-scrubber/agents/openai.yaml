@@ -1,0 +1,4 @@
+interface:
+  display_name: "Matilda PII Scrubber"
+  short_description: "Scrub CSV, XLSX, XLS and Parquet with reviewed PII masks"
+  default_prompt: "Use $matilda-pii-scrubber on these CSV, XLSX, XLS or Parquet files and return each processed file, summary and upload-preparedness status in chat; tell me to extract archives first, deny other formats, preserve originals and do not upload."
