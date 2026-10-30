@@ -2,9 +2,11 @@
 
 **Version 1.0.0 · Private team distribution**
 
-A Codex skill for reviewing and masking confirmed human PII in customer billing and RVTools files before a separate manual Matilda upload. It preserves originals, billing data and resource identifiers. Every run must return the processed file links, a per-file summary and an explicit upload-preparedness status directly in chat. The processing scripts do not upload files.
+A Codex skill for reviewing and masking confirmed human PII in customer billing and RVTools files before a separate manual Matilda upload. It preserves originals, billing data and resource identifiers. Every run returns
 
-This is the first GitHub release. Earlier 5.x numbers were internal development builds; GitHub releases start at 1.0.0. Version 1.0 includes the separate Parquet footer/schema metadata checks and the four-format intake restriction from the validated internal 5.1.0 build.
+1. The processed file links
+2. A per-file summary
+3. An explicit upload-preparedness status directly in chat.
 
 ## Supported scope
 
