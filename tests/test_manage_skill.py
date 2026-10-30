@@ -380,10 +380,13 @@ class ManageSkillTests(unittest.TestCase):
         (scripts / "preflight.py").write_text("print(" + repr(json.dumps(preflight)) + ")\n")
         runtime = self.root / "discovery-runtime"
         real_run = subprocess.run
+        real_env_builder = manager.venv.EnvBuilder
 
         def create_synthetic_runtime(path):
-            (Path(path) / "bin").mkdir(parents=True)
-            (Path(path) / "bin/python").symlink_to(sys.executable)
+            # A raw symlink to a virtualenv executable can lose the correct
+            # Python prefix/framework configuration. Create a real stdlib-only
+            # venv; these synthetic tests need no downloaded dependencies.
+            real_env_builder(with_pip=False).create(path)
 
         def omit_dependency_install(args, **kwargs):
             if args[1:4] == ["-m", "pip", "install"]:
@@ -393,7 +396,11 @@ class ManageSkillTests(unittest.TestCase):
         with (patch.object(manager.venv, "EnvBuilder") as builder,
               patch.object(manager.subprocess, "run", side_effect=omit_dependency_install)):
             builder.return_value.create.side_effect = create_synthetic_runtime
-            result = manager.run_validation(root, runtime, self.root / "discovery-validation.log")
+            log = self.root / "discovery-validation.log"
+            try:
+                result = manager.run_validation(root, runtime, log)
+            except manager.ManageError as error:
+                self.fail(f"{error}\nSynthetic fixture log:\n{log.read_text() if log.exists() else '(missing)'}")
         self.assertTrue(result["passed"])
         self.assertEqual(result["skill_tests"], 2, "Both test_prefixed.py and smoke_test.py must execute")
         self.assertEqual(result["updater_tests"], 1)
