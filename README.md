@@ -51,13 +51,19 @@ The manager, runtime, validation evidence and backups live outside the skill at 
 python3.12 ~/.local/share/matilda-pii-scrubber/manage_skill.py status
 ```
 
-You can also ask Codex: “Install the latest stable release of https://github.com/Qrymbs/Matilda-PII-Scrubber-Codex-Skill using its README and managed installer. The repository is public; no invitation is required. Check Git, GitHub CLI and Python 3.12, reuse my GitHub authentication or ask me to sign in if needed, run all installation checks, and report the installed version and result.”
+For installation through Codex, open Codex desktop in a local project and paste:
+
+> Install the latest stable release of https://github.com/Qrymbs/Matilda-PII-Scrubber-Codex-Skill using its README and managed installer. The repository is public. Check Git, GitHub CLI and Python 3.12, and install missing prerequisites as needed. Reuse my GitHub authentication or ask me to sign in if required. Keep the software outside customer-data folders, preserve existing installations and avoid duplicate skill copies. Run the complete installation validation, then the manager’s status command and one update check. Confirm Codex can discover the skill and report the installed version and results. Record the absolute Python 3.12 and installed manager paths for the weekly update task.
+
+For scheduling, record the absolute Python 3.12 launcher used to run the installer and the installed manager at `~/.local/share/matilda-pii-scrubber/manage_skill.py`, expanding `~` to the user's home directory. The `python` path returned by `status` is the version-specific processing runtime; use it for scrubbing, not as the permanent weekly-update launcher. Confirm that GitHub CLI (`gh`) is available in the scheduled task's environment when testing its command.
 
 ## Use it
 
 Start a local Codex chat, attach or provide the absolute paths to authorized customer files, and say:
 
-> Use $matilda-pii-scrubber on these files. Return every processed file as a clickable link, a per-file PII summary and the final Matilda upload-preparedness status directly in this chat. Preserve the originals and do not upload anything.
+> Use $matilda-pii-scrubber on these files.
+
+The skill already requires preserving originals and returning processed file links, per-file summaries, verification reports and readiness decisions directly in chat. It never uploads to Matilda. If an input is rejected or no safe output can be produced, the chat explains that result instead of promising a scrubbed file.
 
 Codex must use the managed Python interpreter reported by `status` for processing, verification and finalization. Answer any identity/context questions based on evidence. If you do not know, say so; the file stays blocked.
 
@@ -79,7 +85,7 @@ Backups and candidate environments are retained locally; clean up old ones only 
 
 After a successful install, run the update command once in an ordinary local chat to verify GitHub authentication and connectivity. No repository invitation is needed. Then send Codex this prompt on **each teammate's own computer**:
 
-> Create a standalone local scheduled task named “Update Matilda PII Scrubber” for every Monday at 9:00 AM in my local timezone, with a new chat for each run. Run `python3.12 ~/.local/share/matilda-pii-scrubber/manage_skill.py update` using my existing GitHub authentication. Install only the latest stable release from Qrymbs/Matilda-PII-Scrubber-Codex-Skill through that manager and its validation checks. Do not process customer files. Report a successful version change, failed update or required action; keep the current working installation when validation fails. If it is already current, do not send an update notification.
+> Create a standalone local scheduled task named “Update Matilda PII Scrubber” for every Monday at 9:00 AM in my local timezone, starting a new chat for each run. Use this local project and the absolute Python 3.12 and installed manager paths verified during setup to run the manager’s update command. Use my existing GitHub authentication. Install only published stable releases from Qrymbs/Matilda-PII-Scrubber-Codex-Skill through the managed updater and its validation checks. Preserve the working installation if validation fails. Do not process customer files. Notify me about version changes, failures or required action; stay quiet when already current. Confirm the schedule and test the configured command once.
 
 Use a **local** scheduled task associated with a local project/folder, not a cloud task or a fresh worktree. Review the schedule Codex creates and test its first run. Local scheduled work requires the computer to be powered on and Codex desktop running. Authentication, network access or execution approval may need attention; scheduling does not bypass those requirements. The repository cannot enable a task on someone else's computer. [Official automation guidance](https://learn.chatgpt.com/docs/automations)
 
