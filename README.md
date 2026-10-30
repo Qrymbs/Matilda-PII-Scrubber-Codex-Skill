@@ -2,9 +2,11 @@
 
 **Version 1.1.0 · Private team distribution**
 
-A Codex skill for reviewing and masking confirmed human PII in customer billing and RVTools files before a separate manual Matilda upload. It preserves originals, billing data and resource identifiers. Every run must return the processed file links, a per-file summary and an explicit upload-preparedness status directly in chat. The processing scripts do not upload files.
+A Codex skill for reviewing and masking confirmed human PII in customer billing and RVTools files before a separate manual Matilda upload. It preserves originals, billing data and resource identifiers. Every run returns
 
-Version 1.1 adds native XLS scrubbing and verification. Supported BIFF8 workbooks now remain `.xls` and can qualify for manual upload after the same review gates as the other formats. Version 1.0 used a blocked values-only conversion; reprocess XLS originals with the new release. Earlier 5.x numbers were internal development builds preceding GitHub 1.0.0.
+1. The processed file links
+2. A per-file summary
+3. An explicit upload-preparedness status directly in chat.
 
 ## Supported scope
 
